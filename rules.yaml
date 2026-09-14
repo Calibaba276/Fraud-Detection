@@ -1,0 +1,23 @@
+abnormal_amount:
+  enabled: true
+  ratio: 5.0
+  severity: 0.65
+excessive_activity:
+  enabled: true
+  window_minutes: 60
+  max_transactions: 8
+  severity: 0.55
+blocklists:
+  enabled: true
+  merchants: []
+  devices: []
+  ip_addresses: []
+  severity: 0.95
+impossible_travel:
+  enabled: true
+  minimum_distance_km: 1500
+  minimum_minutes: 90
+  severity: 0.9
+decision:
+  review_threshold: 0.35
+  decline_threshold: 0.75
