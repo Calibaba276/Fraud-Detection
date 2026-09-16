@@ -63,3 +63,8 @@ class ScoreResponse(BaseModel):
 
 class VerificationRequest(BaseModel):
     confirmed: bool
+
+
+class TransactionRecord(BaseModel):
+    transaction: Transaction
+    result: ScoreResponse

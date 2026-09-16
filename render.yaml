@@ -1,0 +1,27 @@
+services:
+  - type: web
+    name: sentinel-fraud-api
+    runtime: python
+    plan: free
+    autoDeployTrigger: 'off'
+    buildCommand: >-
+      python -m pip install . &&
+      python -m fraud_detection.cli generate --output data/transactions.csv --rows 20000 &&
+      python -m fraud_detection.cli train data/transactions.csv --output artifacts/model.joblib
+    startCommand: python -m uvicorn fraud_detection.api:app --host 0.0.0.0 --port $PORT --workers 1
+    healthCheckPath: /ready
+    envVars:
+      - key: PYTHON_VERSION
+        value: '3.13.15'
+      - key: FRAUD_MODEL_PATH
+        value: artifacts/model.joblib
+      - key: FRAUD_RULES_PATH
+        value: rules.yaml
+      - key: DATABASE_URL
+        value: sqlite:////tmp/fraud_detection.db
+      - key: FRAUD_API_KEY
+        generateValue: true
+      - key: FRAUD_ALLOWED_ORIGINS
+        sync: false
+      - key: OMP_NUM_THREADS
+        value: '1'

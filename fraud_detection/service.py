@@ -8,10 +8,10 @@ import pandas as pd
 from .authorization import InMemoryPaymentAuthorizer, PaymentAuthorizer
 from .features import engineer_features
 from .model import load_model, predict_probability
-from .persistence import get_account_history, get_prediction, record_prediction, update_workflow_status
+from .persistence import get_account_history, get_prediction, get_recent_predictions, record_prediction, update_workflow_status
 from .risk import RiskConfig, aggregate_risk, decide
 from .rules import RuleEngine, load_rule_config
-from .schemas import RuleMatch, ScoreResponse, Transaction
+from .schemas import RuleMatch, ScoreResponse, Transaction, TransactionRecord
 
 
 class FraudService:
@@ -27,6 +27,8 @@ class FraudService:
         self._transactions: dict[str, Transaction] = {}
 
     def score(self, transaction: Transaction, context: dict | None = None) -> ScoreResponse:
+        if transaction.transaction_id in self._results or (self.session_factory and get_prediction(self.session_factory, transaction.transaction_id)):
+            raise ValueError("This transaction ID has already been scored. Use a new transaction ID.")
         started = time.perf_counter()
         frame = pd.DataFrame([transaction.model_dump()])
         history = self._load_history(transaction)
@@ -48,6 +50,26 @@ class FraudService:
             record_prediction(self.session_factory, result, transaction)
         return result
 
+    def recent_transactions(self, limit: int = 500) -> list[TransactionRecord]:
+        if self.session_factory:
+            return [TransactionRecord(transaction=Transaction.model_validate(row.transaction_data), result=self._result_from_record(row))
+                    for row in get_recent_predictions(self.session_factory, limit) if row.transaction_data]
+        ids = list(reversed(self._results))[:limit]
+        return [TransactionRecord(transaction=self._transactions[key], result=self._results[key]) for key in ids]
+
+    def system_info(self) -> dict:
+        return {
+            "model_version": self.bundle["version"],
+            "model_name": type(self.bundle["model"]).__name__,
+            "feature_count": len(self.bundle["features"]),
+            "review_threshold": self.risk_config.review_threshold,
+            "decline_threshold": self.risk_config.decline_threshold,
+            "model_weight": 0.7,
+            "rule_weight": 0.3,
+            "persistence": "database" if self.session_factory else "memory",
+            "rules": [{"id": key, "enabled": value.get("enabled", False)} for key, value in self.rules.config.items() if key != "decision"],
+        }
+
     def _load_history(self, transaction: Transaction) -> pd.DataFrame:
         if self.session_factory:
             rows = get_account_history(self.session_factory, transaction.account_id)
@@ -57,14 +79,16 @@ class FraudService:
 
     def verify(self, transaction_id: str, confirmed: bool, account_id: str | None = None) -> ScoreResponse:
         result = self._results.get(transaction_id)
+        transaction = getattr(self, "_transactions", {}).get(transaction_id)
         if result is None and self.session_factory:
             record = get_prediction(self.session_factory, transaction_id)
             if record is not None and account_id is not None and record.account_id != account_id:
                 raise PermissionError("Transaction does not belong to this account")
             result = self._result_from_record(record)
+            if record is not None and record.transaction_data:
+                transaction = Transaction.model_validate(record.transaction_data)
         if result is None:
             raise KeyError(transaction_id)
-        transaction = getattr(self, "_transactions", {}).get(transaction_id)
         if transaction is not None and account_id is not None and transaction.account_id != account_id:
             raise PermissionError("Transaction does not belong to this account")
         if result.workflow_status != "pending_verification":
@@ -72,7 +96,10 @@ class FraudService:
         if confirmed:
             updated = result.model_copy(update={"workflow_status": "verification_received", "next_action": "manual_review", "user_message": "Your confirmation was received. The transaction remains on hold pending review."})
         else:
-            updated = result.model_copy(update={"workflow_status": "blocked", "next_action": "contact_support", "user_message": "The transaction was blocked. Contact support if you need help securing your account."})
+            if transaction is None:
+                raise ValueError("Transaction details are unavailable; contact support to block this payment")
+            authorization_status = self.authorizer.authorize(transaction, "decline")
+            updated = result.model_copy(update={"workflow_status": "blocked", "authorization_status": authorization_status, "next_action": "contact_support", "user_message": "The transaction was blocked. Contact support if you need help securing your account."})
         self._results[transaction_id] = updated
         if self.session_factory:
             update_workflow_status(self.session_factory, transaction_id, updated)

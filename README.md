@@ -2,6 +2,41 @@
 
 A local-first fraud-monitoring service that generates realistic synthetic transactions, constructs leakage-aware historical features, evaluates configurable rules, trains a supervised classifier, and exposes a FastAPI scoring endpoint.
 
+## Sentinel frontend
+
+The `frontend/` folder contains a responsive React/TypeScript dashboard: overview, searchable history, CSV export, transaction scoring, verification queue, and model/rule information. Examples are synthetic inputs scored by your actual model.
+
+Set up Python and train the model using Quickstart below. Then, with Node.js 22.13+ installed:
+
+```powershell
+cd frontend
+npm install
+cd ..
+.\start.ps1
+```
+
+Open `http://localhost:3000`. The startup script runs both services with local SQLite history. Press Ctrl+C to stop. If PowerShell blocks the script, use `powershell -ExecutionPolicy Bypass -File .\start.ps1` for that invocation.
+
+Alternatively, run the services in separate terminals:
+
+```powershell
+# Terminal 1, repository root
+$env:DATABASE_URL = "sqlite:///fraud_detection.db"
+.\.venv\Scripts\python.exe -m uvicorn fraud_detection.api:app --host 127.0.0.1 --port 8000
+
+# Terminal 2, frontend folder
+cd frontend
+npm run dev -- --host 127.0.0.1 --port 3000
+```
+
+Select **Analyze transaction**, choose **Everyday purchase** or **Unusual purchase**, and submit. Open a result to inspect risk signals and payment status. For held transactions, enter the account ID and record whether the account holder recognizes the payment. Confirmation still requires manual review.
+
+Statistics and exports cover the latest 500 scored transactions. Amounts remain in their original currency. The backend URL is a saved device preference; API keys and transaction details are not stored in browser storage.
+
+For online deployment, follow [HOSTING.md](HOSTING.md). The [Render blueprint](render.yaml) prepares the Python backend; a hosting account and deployment are required before online scoring works.
+
+Frontend checks: `npm run build` and `npm run lint` inside `frontend/`. Backend checks: `python -m pytest -q` at the repository root.
+
 ## Quickstart
 
 Requires Python 3.11+.

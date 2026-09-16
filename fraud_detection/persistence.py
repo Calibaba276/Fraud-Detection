@@ -64,6 +64,11 @@ def get_prediction(session_factory, transaction_id: str):
         return session.scalar(select(Prediction).where(Prediction.transaction_id == transaction_id).order_by(Prediction.created_at.desc()))
 
 
+def get_recent_predictions(session_factory, limit: int = 500):
+    with session_factory() as session:
+        return list(session.scalars(select(Prediction).order_by(Prediction.id.desc()).limit(limit)))
+
+
 def get_account_history(session_factory, account_id: str, before: datetime | None = None) -> list[dict[str, Any]]:
     with session_factory() as session:
         query = select(Prediction.transaction_data).where(Prediction.account_id == account_id)

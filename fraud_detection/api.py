@@ -3,10 +3,12 @@ from __future__ import annotations
 import logging
 import os
 from pathlib import Path
+from threading import Lock
 
-from fastapi import FastAPI, Header, HTTPException
+from fastapi import FastAPI, Header, HTTPException, Query
+from fastapi.middleware.cors import CORSMiddleware
 
-from .schemas import ScoreResponse, Transaction, VerificationRequest
+from .schemas import ScoreResponse, Transaction, TransactionRecord, VerificationRequest
 from .persistence import create_store
 from .service import FraudService
 
@@ -14,9 +16,18 @@ logging.basicConfig(level=logging.INFO, format="%(message)s")
 logger = logging.getLogger("fraud_detection")
 app = FastAPI(title="Banking Fraud Detection API", version="0.1.0")
 _service: FraudService | None = None
+_service_lock = Lock()
+allowed_origins = [value.strip() for value in os.getenv("FRAUD_ALLOWED_ORIGINS", "http://localhost:3000,http://127.0.0.1:3000,http://localhost:5173,http://127.0.0.1:5173").split(",") if value.strip()]
+if allowed_origins:
+    app.add_middleware(CORSMiddleware, allow_origins=allowed_origins, allow_methods=["GET", "POST"], allow_headers=["Content-Type", "X-API-Key", "X-Account-ID"])
 
 
 def get_service() -> FraudService:
+    with _service_lock:
+        return _initialize_service()
+
+
+def _initialize_service() -> FraudService:
     global _service
     if _service is None:
         model_path = os.getenv("FRAUD_MODEL_PATH", "artifacts/model.joblib")
@@ -43,10 +54,25 @@ def ready() -> dict[str, str]:
 @app.post("/score", response_model=ScoreResponse)
 def score(transaction: Transaction, x_api_key: str | None = Header(default=None)) -> ScoreResponse:
     _check_api_key(x_api_key)
-    result = get_service().score(transaction)
+    try:
+        result = get_service().score(transaction)
+    except ValueError as error:
+        raise HTTPException(status_code=409, detail=str(error)) from error
     if result.decision != "approve":
         logger.warning("fraud_alert transaction_id=%s decision=%s risk_score=%s", result.transaction_id, result.decision, result.risk_score)
     return result
+
+
+@app.get("/transactions", response_model=list[TransactionRecord])
+def transactions(x_api_key: str | None = Header(default=None), limit: int = Query(default=500, ge=1, le=1000)):
+    _check_api_key(x_api_key)
+    return get_service().recent_transactions(limit)
+
+
+@app.get("/system")
+def system_info(x_api_key: str | None = Header(default=None)) -> dict:
+    _check_api_key(x_api_key)
+    return get_service().system_info()
 
 
 @app.post("/transactions/{transaction_id}/verify", response_model=ScoreResponse)

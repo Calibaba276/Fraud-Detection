@@ -52,7 +52,7 @@ def _historical_values(current: pd.DataFrame, source: pd.DataFrame, function, wi
     combined = source.copy()
     combined["timestamp"] = pd.to_datetime(combined["timestamp"], utc=True)
     values = function(combined, window)
-    history_length = len(source)
+    history_length = len(source) - len(current)
     return values.iloc[history_length:].reset_index(drop=True)
 
 

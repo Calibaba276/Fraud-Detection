@@ -18,6 +18,9 @@ def train_model(features: pd.DataFrame, output: str | Path = "artifacts/model.jo
 
     train_features = engineer_features(train_frame.reset_index(drop=True))
     test_features = engineer_features(test_frame.reset_index(drop=True), history=train_frame.reset_index(drop=True))
+    # Feature engineering sorts rows; keep labels aligned with that sorted order.
+    y_train = train_features["is_fraud"].astype(int)
+    y_test = test_features["is_fraud"].astype(int)
     x_train, x_test = model_matrix(train_features), model_matrix(test_features)
     classifier = HistGradientBoostingClassifier(max_iter=160, learning_rate=0.08, max_leaf_nodes=15, random_state=seed, class_weight="balanced")
     classifier.fit(x_train, y_train)
