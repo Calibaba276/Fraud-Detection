@@ -1,6 +1,10 @@
 ﻿export type Transaction = {
-  transaction_id: string; timestamp: string; account_id: string; card_id: string;
-  amount: number; currency: string; merchant_id: string; merchant_category: string;
+  transaction_id: string; 
+  timestamp: string; 
+  account_id: string; 
+  card_id: string;
+  amount: number; 
+  currency: string; merchant_id: string; merchant_category: string;
   transaction_type: string; location: string; device_id: string; ip_address: string;
   account_age_days: number; avg_monthly_spend: number; is_foreign_transaction: boolean;
 };

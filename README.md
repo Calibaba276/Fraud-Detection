@@ -6,6 +6,8 @@ A local-first fraud-monitoring service that generates realistic synthetic transa
 
 The `frontend/` folder contains a responsive React/TypeScript dashboard: overview, searchable history, CSV export, transaction scoring, verification queue, and model/rule information. Examples are synthetic inputs scored by your actual model.
 
+> Authentication is intentionally simulated with browser localStorage for demonstration purposes. It is not secure and must be replaced with a real authentication provider before production use.
+
 Set up Python and train the model using Quickstart below. Then, with Node.js 22.13+ installed:
 
 ```powershell

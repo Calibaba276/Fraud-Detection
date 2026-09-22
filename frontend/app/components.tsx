@@ -1,12 +1,173 @@
 'use client';
+
 import { useEffect, useRef, type ReactNode } from 'react';
 import { statuses, humanize, percent, ruleNames, type Score, type SystemInfo } from './client';
-export function Badge({ status }: { status: Score['workflow_status'] }) { return <span className={'badge ' + status}><span/> {statuses[status]}</span>; }
-export function Modal({ title, subtitle, onClose, children, wide = false }: { title: string; subtitle: string; onClose: () => void; children: ReactNode; wide?: boolean }) {
-  const ref = useRef<HTMLDialogElement>(null);
-  useEffect(() => { const element = ref.current; const previous = document.activeElement as HTMLElement; element?.showModal(); return () => { element?.close(); previous?.focus(); }; }, []);
-  return <dialog ref={ref} aria-labelledby="dialog-title" className={'modal ' + (wide ? 'wide' : '')} onCancel={event => { event.preventDefault(); onClose(); }}><div className="modal-heading"><div><p className="eyebrow">SENTINEL WORKSPACE</p><h2 id="dialog-title">{title}</h2><p>{subtitle}</p></div><button className="icon-button" aria-label="Close dialog" onClick={onClose}>×</button></div>{children}</dialog>;
+
+export function Badge({ status }: { status: Score['workflow_status'] }) {
+  return (
+    <span className={'badge ' + status}>
+      <span />
+      {statuses[status]}
+    </span>
+  );
 }
+
+export function Modal({
+  title,
+  subtitle,
+  onClose,
+  children,
+  wide = false,
+}: {
+  title: string;
+  subtitle: string;
+  onClose: () => void;
+  children: ReactNode;
+  wide?: boolean;
+}) {
+  const ref = useRef<HTMLDialogElement>(null);
+
+  useEffect(() => {
+    const element = ref.current;
+    const previous = document.activeElement as HTMLElement;
+    element?.showModal();
+    return () => {
+      element?.close();
+      previous?.focus();
+    };
+  }, []);
+
+  return (
+    <dialog
+      ref={ref}
+      aria-labelledby="dialog-title"
+      className={'modal ' + (wide ? 'wide' : '')}
+      onCancel={event => {
+        event.preventDefault();
+        onClose();
+      }}
+    >
+      <div className="modal-heading">
+        <div>
+          <p className="eyebrow">SENTINEL WORKSPACE</p>
+          <h2 id="dialog-title">{title}</h2>
+          <p>{subtitle}</p>
+        </div>
+        <button className="icon-button" aria-label="Close dialog" onClick={onClose}>
+          ×
+        </button>
+      </div>
+      {children}
+    </dialog>
+  );
+}
+
 export function Engine({ system }: { system: SystemInfo | null }) {
-  return <section className="engine-layout"><article className="panel"><div className="panel-heading"><div><h2>One score. Two independent signals.</h2><p>The same scoring pipeline used by your Python service.</p></div></div><div className="engine-body"><div className="formula"><div><b>{system ? percent(system.model_weight) : '—'}</b><span>Model probability</span></div><span>＋</span><div><b>{system ? percent(system.rule_weight) : '—'}</b><span>Strongest rule severity</span></div></div><p className="muted">The combined risk score determines whether a transaction is approved, held for verification, or declined.</p><dl className="detail-grid"><div><dt>Classifier</dt><dd>{system?.model_name || 'Connect engine to load'}</dd></div><div><dt>Model version</dt><dd>{system?.model_version || '—'}</dd></div><div><dt>Input features</dt><dd>{system?.feature_count ?? '—'}</dd></div><div><dt>History storage</dt><dd>{system?.persistence === 'database' ? 'Database' : system ? 'Server memory' : '—'}</dd></div></dl><div className="thresholds"><div><span className="badge approved">Approve</span><p>{system ? 'Risk below ' + percent(system.review_threshold) : '—'}</p></div><div><span className="badge pending_verification">Review</span><p>{system ? percent(system.review_threshold) + ' to below ' + percent(system.decline_threshold) : '—'}</p></div><div><span className="badge blocked">Decline</span><p>{system ? percent(system.decline_threshold) + ' and above' : '—'}</p></div></div></div></article><article className="panel"><div className="panel-heading"><div><h2>Detection rules</h2><p>Current configuration from your Python service.</p></div></div><div className="engine-body">{system ? system.rules.map(rule => <div className="rule-setting" key={rule.id}><div><b>{ruleNames[rule.id] || humanize(rule.id)}</b>{rule.id === 'impossible_travel' && <small>Requires location context from an integration.</small>}{rule.id === 'blocklists' && <small>Matches only entities in configured blocklists.</small>}</div><span className={'badge ' + (rule.enabled ? 'approved' : 'verification_received')}>{rule.enabled ? 'Enabled' : 'Disabled'}</span></div>) : <p className="muted">Connect the engine to load its rules.</p>}<div className="info-note"><b>Built for research</b><p>The bundled training data is synthetic. Scores are model estimates; no real-world accuracy is claimed. Currency amounts are used as supplied, without conversion.</p></div></div></article></section>;
+  return (
+    <section className="engine-layout">
+      <article className="panel">
+        <div className="panel-heading">
+          <div>
+            <h2>One score. Two independent signals.</h2>
+            <p>The same scoring pipeline used by your Python service.</p>
+          </div>
+        </div>
+
+        <div className="engine-body">
+          <div className="formula">
+            <div>
+              <b>{system ? percent(system.model_weight) : '—'}</b>
+              <span>Model probability</span>
+            </div>
+            <span>＋</span>
+            <div>
+              <b>{system ? percent(system.rule_weight) : '—'}</b>
+              <span>Strongest rule severity</span>
+            </div>
+          </div>
+
+          <p className="muted">
+            The combined risk score determines whether a transaction is approved, held for
+            verification, or declined.
+          </p>
+
+          <dl className="detail-grid">
+            <div>
+              <dt>Classifier</dt>
+              <dd>{system?.model_name || 'Connect engine to load'}</dd>
+            </div>
+            <div>
+              <dt>Model version</dt>
+              <dd>{system?.model_version || '—'}</dd>
+            </div>
+            <div>
+              <dt>Input features</dt>
+              <dd>{system?.feature_count ?? '—'}</dd>
+            </div>
+            <div>
+              <dt>History storage</dt>
+              <dd>{system?.persistence === 'database' ? 'Database' : system ? 'Server memory' : '—'}</dd>
+            </div>
+          </dl>
+
+          <div className="thresholds">
+            <div>
+              <span className="badge approved">Approve</span>
+              <p>{system ? 'Risk below ' + percent(system.review_threshold) : '—'}</p>
+            </div>
+            <div>
+              <span className="badge pending_verification">Review</span>
+              <p>
+                {system
+                  ? percent(system.review_threshold) + ' to below ' + percent(system.decline_threshold)
+                  : '—'}
+              </p>
+            </div>
+            <div>
+              <span className="badge blocked">Decline</span>
+              <p>{system ? percent(system.decline_threshold) + ' and above' : '—'}</p>
+            </div>
+          </div>
+        </div>
+      </article>
+
+      <article className="panel">
+        <div className="panel-heading">
+          <div>
+            <h2>Detection rules</h2>
+            <p>Current configuration from your Python service.</p>
+          </div>
+        </div>
+
+        <div className="engine-body">
+          {system ? (
+            system.rules.map(rule => (
+              <div className="rule-setting" key={rule.id}>
+                <div>
+                  <b>{ruleNames[rule.id] || humanize(rule.id)}</b>
+                  {rule.id === 'impossible_travel' && (
+                    <small>Requires location context from an integration.</small>
+                  )}
+                  {rule.id === 'blocklists' && <small>Matches only entities in configured blocklists.</small>}
+                </div>
+                <span className={'badge ' + (rule.enabled ? 'approved' : 'verification_received')}>
+                  {rule.enabled ? 'Enabled' : 'Disabled'}
+                </span>
+              </div>
+            ))
+          ) : (
+            <p className="muted">Connect the engine to load its rules.</p>
+          )}
+
+          <div className="info-note">
+            <b>Built for research</b>
+            <p>
+              The bundled training data is synthetic. Scores are model estimates; no real-world
+              accuracy is claimed. Currency amounts are used as supplied, without conversion.
+            </p>
+          </div>
+        </div>
+      </article>
+    </section>
+  );
 }
